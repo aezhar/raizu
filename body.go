@@ -26,9 +26,8 @@ import (
 )
 
 var (
-	ErrUnsupportedMediaType = errors.New("unsupported media type")
-	ErrMalformedContent     = errors.New("content has syntax error")
-	ErrTooLarge             = errors.New("request is too large")
+	ErrMalformedContent = errors.New("content has syntax error")
+	ErrTooLarge         = errors.New("request is too large")
 )
 
 type decoderFn func(r io.Reader, out any) error
