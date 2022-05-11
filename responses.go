@@ -17,9 +17,21 @@
 package raizu
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
+
+func StartJSONResponse(wr http.ResponseWriter, statusCode int) {
+	wr.Header().Set("X-Content-Type-Options", "nosniff")
+	wr.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	wr.WriteHeader(statusCode)
+}
+
+func WriteJSON(wr http.ResponseWriter, statusCode int, body any) error {
+	StartJSONResponse(wr, statusCode)
+	return json.NewEncoder(wr).Encode(body)
+}
 
 func WriteError(wr http.ResponseWriter, err *Error) {
 	http.Error(wr, err.Error(), err.status)
