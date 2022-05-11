@@ -29,7 +29,7 @@ func WriteOKMessage(wr http.ResponseWriter, msg string) error {
 	wr.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	wr.Header().Set("X-Content-Type-Options", "nosniff")
 	wr.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(wr, "%s", msg)
+	_, _ = fmt.Fprintf(wr, "%s\n", msg)
 	return nil
 }
 
