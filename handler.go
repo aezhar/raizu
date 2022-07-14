@@ -21,6 +21,23 @@ import (
 	"net/http"
 )
 
+type responseWriterProxy struct {
+	proxied     http.ResponseWriter
+	wroteHeader bool
+}
+
+func (p *responseWriterProxy) Header() http.Header { return p.proxied.Header() }
+
+func (p *responseWriterProxy) Write(bytes []byte) (int, error) {
+	p.wroteHeader = true
+	return p.proxied.Write(bytes)
+}
+
+func (p *responseWriterProxy) WriteHeader(statusCode int) {
+	p.wroteHeader = true
+	p.proxied.WriteHeader(statusCode)
+}
+
 type Handler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) error
 }
@@ -28,13 +45,18 @@ type Handler interface {
 type Wrapper struct{ Handler }
 
 func (w Wrapper) ServeHTTP(wr http.ResponseWriter, rq *http.Request) {
-	if err := w.Handler.ServeHTTP(wr, rq); err != nil {
+	p := &responseWriterProxy{proxied: wr}
+	if err := w.Handler.ServeHTTP(p, rq); err != nil {
 		var raizuError *Error
 		if !errors.As(err, &raizuError) {
 			// TODO: log error here before dropping it.
 			raizuError = ErrInternalServerError
 		}
-		WriteError(wr, raizuError)
+
+		if !p.wroteHeader {
+			WriteError(p, raizuError)
+		}
+
 		return
 	}
 }
