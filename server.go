@@ -73,15 +73,18 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.srv.Shutdown(ctx)
 }
 
-func NewServer() *Server {
+func NewServerOpt(s *http.Server) *Server {
 	m := http.NewServeMux()
 
-	s := &http.Server{
+	s.Handler = m
+
+	return &Server{srv: s, mux: m}
+}
+
+func NewServer() *Server {
+	return NewServerOpt(&http.Server{
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  15 * time.Second,
-		Handler:      m,
-	}
-
-	return &Server{srv: s, mux: m}
+	})
 }
