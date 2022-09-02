@@ -14,20 +14,39 @@
 // permissions and limitations under the License.
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-package raizu
+package raizumux
 
 import (
-	"net"
+	"net/http"
+	"strings"
+
+	"github.com/aezhar/raizu"
 )
 
-const (
-	DefaultAddress = ":http"
-)
+type Mux struct {
+	prefix string
+	mux    http.ServeMux
+}
 
-func ListenAndServe(s *Server, address string) error {
-	l, err := net.Listen("tcp", address)
-	if err != nil {
-		return err
+func (m *Mux) Prefix() string {
+	return m.prefix
+}
+
+func (m *Mux) Handler() http.Handler {
+	return http.StripPrefix(m.prefix, &m.mux)
+}
+
+func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mux.ServeHTTP(w, r)
+}
+
+func (m *Mux) Mount(prefix string, h http.Handler) {
+	if !strings.HasSuffix(prefix, "/") {
+		prefix = prefix + "/"
 	}
-	return s.Serve(l)
+	m.mux.Handle(prefix, http.StripPrefix(prefix, h))
+}
+
+func New(prefix string) raizu.MounterHandler {
+	return &Mux{prefix: prefix}
 }

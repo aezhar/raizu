@@ -20,71 +20,48 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"time"
 )
 
-// Muxer is anything that can register HTTP handlers.
-type Muxer interface {
-	Handle(pattern string, handler http.Handler)
-	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+// A HTTPServer represents an HTTP server.
+type HTTPServer interface {
+	// Close immediately closes all active [net.Listener] instances and
+	// any connections in state [http.StateNew], [http.StateActive], or [http.StateIdle]. For a
+	// graceful shutdown, use Shutdown.
+	//
+	// See [http.Server.Close] for more details.
+	Close() error
+
+	// Shutdown gracefully shuts down the server without interrupting any
+	// active connections.
+	//
+	// See [http.Server.Shutdown] for more details.
+	Shutdown(ctx context.Context) error
+
+	// Serve starts accepting incoming connections on the [net.Listener] in l, creating a
+	// new service goroutine for each. The service goroutines read requests and
+	// then is expected to call srv.Handler of the corresponding NewBlueprint to reply to them.
+	//
+	// See [http.Server.Serve] for more details.
+	Serve(l net.Listener) error
 }
 
-// Mountable is anything that can be mounted onto a Server.
-type Mountable interface {
-	Mount(m Muxer)
-}
-
-// The MountableFunc type is an adapter to allow the use of
-// ordinary functions as a Mountable. If f is a function
-// with the appropriate signature, MountableFunc(f) is a
-// Mountable that calls f.
-type MountableFunc func(m Muxer)
-
-func (f MountableFunc) Mount(m Muxer) { f(m) }
-
-// Server represents a http server with a combined multiplexer.
-type Server struct {
-	srv *http.Server
-	mux *http.ServeMux
-}
-
-func (s *Server) Close() error {
-	return s.srv.Close()
-}
-
-// Mount mounts the given Mountable resource to the multiplexer.
-func (s *Server) Mount(m Mountable) { m.Mount(s.mux) }
-
-// Serve works just like net/http.Server.Serve and accepts incoming
-// connections on the Listener l, creating a new service goroutine
-// for each. The service goroutines read requests and then look for a
-// handler depending on the referenced resource.
+// NewServer creates a new [raizu.HTTPServer] based on the [raizu.ServerConfig] provided.
 //
-// Serve always returns a non-nil error and closes l.
-//
-// After Shutdown or Close, the returned error is ErrServerClosed.
-//
-// Serve will block until
-func (s *Server) Serve(l net.Listener) error {
-	return s.srv.Serve(l)
-}
+// All Blueprints provided in [raizu.ServerConfig.Blueprints] will be instantiated and
+// mounted on the server. If any [raizu.Blueprint] instance fails, the
+// whole function fails and returns an error instead.
+func NewServer(config ServerConfig) (HTTPServer, error) {
+	h, err := config.Blueprint.NewHandlerProvider()
+	if err != nil {
+		return nil, err
+	}
 
-func (s *Server) Shutdown(ctx context.Context) error {
-	return s.srv.Shutdown(ctx)
-}
-
-func NewServerOpt(s *http.Server) *Server {
-	m := http.NewServeMux()
-
-	s.Handler = m
-
-	return &Server{srv: s, mux: m}
-}
-
-func NewServer() *Server {
-	return NewServerOpt(&http.Server{
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  15 * time.Second,
-	})
+	s := &http.Server{
+		ReadTimeout:  config.ReadTimeout,
+		WriteTimeout: config.WriteTimeout,
+		IdleTimeout:  config.IdleTimeout,
+		TLSConfig:    config.TLSConfig,
+		Handler:      h.Handler(),
+	}
+	return s, nil
 }

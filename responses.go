@@ -22,29 +22,29 @@ import (
 	"net/http"
 )
 
-func StartJSONResponse(wr http.ResponseWriter, statusCode int) {
-	wr.Header().Set("X-Content-Type-Options", "nosniff")
-	wr.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	wr.WriteHeader(statusCode)
+func StartJSONResponse(w http.ResponseWriter, statusCode int) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(statusCode)
 }
 
-func WriteJSON(wr http.ResponseWriter, statusCode int, body any) error {
-	StartJSONResponse(wr, statusCode)
-	return json.NewEncoder(wr).Encode(body)
+func WriteJSON(w http.ResponseWriter, statusCode int, body any) error {
+	StartJSONResponse(w, statusCode)
+	return json.NewEncoder(w).Encode(body)
 }
 
-func WriteError(wr http.ResponseWriter, err *Error) {
-	http.Error(wr, err.Error(), err.status)
+func WriteError(w http.ResponseWriter, err *Error) {
+	http.Error(w, err.Error(), err.status)
 }
 
-func WriteOKMessage(wr http.ResponseWriter, msg string) error {
-	wr.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	wr.Header().Set("X-Content-Type-Options", "nosniff")
-	wr.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(wr, "%s\n", msg)
+func WriteOKMessage(w http.ResponseWriter, msg string) error {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintf(w, "%s\n", msg)
 	return nil
 }
 
-func WriteOK(wr http.ResponseWriter) error {
-	return WriteOKMessage(wr, "ok")
+func WriteOK(w http.ResponseWriter) error {
+	return WriteOKMessage(w, "ok\n")
 }

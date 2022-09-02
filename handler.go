@@ -21,58 +21,53 @@ import (
 	"net/http"
 )
 
-type responseWriterProxy struct {
-	proxied     http.ResponseWriter
-	wroteHeader bool
-}
-
-func (p *responseWriterProxy) Header() http.Header { return p.proxied.Header() }
-
-func (p *responseWriterProxy) Write(bytes []byte) (int, error) {
-	p.wroteHeader = true
-	return p.proxied.Write(bytes)
-}
-
-func (p *responseWriterProxy) WriteHeader(statusCode int) {
-	p.wroteHeader = true
-	p.proxied.WriteHeader(statusCode)
-}
-
+// A Handler responds to an HTTP request.
+//
+// ServeHTTP should write reply headers and data to the ResponseWriter
+// and then return nil to indicate that the request was successfully
+// processed or return an error if handling the request failed for
+// whatever reason.
+//
+// All other notes from [http.Handler] apply here as well.
 type Handler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request) error
 }
 
-type Wrapper struct{ Handler }
+// HTTPHandler wraps a [raizu.Handler] as [http.Handler].
+//
+// Use the WrapHandler constructor function as a shorthand for wrapping a
+// [raizu.Handler] as an [http.Handler].
+type HTTPHandler struct{ Handler }
 
-func (w Wrapper) ServeHTTP(wr http.ResponseWriter, rq *http.Request) {
-	p := &responseWriterProxy{proxied: wr}
-	if err := w.Handler.ServeHTTP(p, rq); err != nil {
+func (h HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	p := &responseProxy{proxied: w}
+	if err := h.Handler.ServeHTTP(p, r); err != nil {
 		var raizuError *Error
 		if !errors.As(err, &raizuError) {
-			// TODO: log error here before dropping it.
 			raizuError = ErrInternalServerError
 		}
 
 		if !p.wroteHeader {
 			WriteError(p, raizuError)
 		}
-
-		return
 	}
 }
 
-func Wrap(h Handler) http.Handler { return &Wrapper{h} }
+// WrapHandler wraps a [raizu.Handler] as [http.Handler].
+func WrapHandler(h Handler) http.Handler { return &HTTPHandler{h} }
 
-// The HandlerFunc type is an adapter to allow the use of
-// ordinary functions as HTTP handlers. If f is a function
-// with the appropriate signature, HandlerFunc(f) is a
-// Handler that calls f.
-type HandlerFunc func(http.ResponseWriter, *http.Request) error
+// HandlerFn is an adapter to allow the use of ordinary functions as
+// [raizu.Handler] handlers. If f is a function with the appropriate
+// signature, HandlerFn(f) is a [raizu.Handler] that calls f.
+type HandlerFn func(http.ResponseWriter, *http.Request) error
 
 // ServeHTTP calls f(w, r).
-func (f HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
+func (f HandlerFn) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	return f(w, r)
 }
 
-// WrapFunc wraps an ordinary function as a HTTP handler.
-func WrapFunc(f HandlerFunc) http.Handler { return Wrap(f) }
+// WrapFn wraps a function as an [http.HandlerFunc].
+func WrapFn(f HandlerFn) http.HandlerFunc { return WrapHandler(f).ServeHTTP }
+
+// Wrap wraps a function as an [http.Handler].
+func Wrap(f HandlerFn) http.Handler { return WrapHandler(f) }

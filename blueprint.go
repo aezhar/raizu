@@ -14,33 +14,30 @@
 // permissions and limitations under the License.
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-package main
+package raizu
 
 import (
-	"errors"
-	"fmt"
-	"log"
 	"net/http"
-
-	"github.com/aezhar/raizu"
 )
 
-func helloWorld(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "Hello World!")
+type HandlerProvider interface {
+	Prefix() string
+	Handler() http.Handler
 }
 
-func main() {
-	s := raizu.NewServer()
-	s.Mount(raizu.MountableFunc(func(m raizu.Muxer) {
-		m.Handle("/", http.HandlerFunc(helloWorld))
-	}))
+type BlueprintImpl[HPT HandlerProvider, CT any] struct {
+	makeFn func(cf CT) (HPT, error)
+	config CT
+}
 
-	if err := raizu.ListenAndServe(s, ":8000"); err != nil {
-		if !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err.Error())
-		}
-	}
+func (bp BlueprintImpl[HPT, CT]) NewHandlerProvider() (HandlerProvider, error) {
+	return bp.makeFn(bp.config)
+}
+
+type Blueprint interface {
+	NewHandlerProvider() (HandlerProvider, error)
+}
+
+func NewBlueprint[HPT HandlerProvider, CT any](makeFn func(cf CT) (HPT, error), cf CT) Blueprint {
+	return BlueprintImpl[HPT, CT]{makeFn, cf}
 }
