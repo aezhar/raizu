@@ -19,22 +19,9 @@ package raizumux
 import (
 	"net/http"
 	"strings"
-
-	"github.com/aezhar/raizu"
 )
 
-type Mux struct {
-	prefix string
-	mux    http.ServeMux
-}
-
-func (m *Mux) Prefix() string {
-	return m.prefix
-}
-
-func (m *Mux) Handler() http.Handler {
-	return http.StripPrefix(m.prefix, &m.mux)
-}
+type Mux struct{ mux http.ServeMux }
 
 func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mux.ServeHTTP(w, r)
@@ -44,9 +31,13 @@ func (m *Mux) Mount(prefix string, h http.Handler) {
 	if !strings.HasSuffix(prefix, "/") {
 		prefix = prefix + "/"
 	}
-	m.mux.Handle(prefix, http.StripPrefix(prefix, h))
+
+	if len(prefix) > 1 {
+		h = http.StripPrefix(prefix[:len(prefix)-1], h)
+	}
+	m.mux.Handle(prefix, h)
 }
 
-func New(prefix string) raizu.MounterHandler {
-	return &Mux{prefix: prefix}
+func New() *Mux {
+	return &Mux{}
 }

@@ -14,46 +14,29 @@
 // permissions and limitations under the License.
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-package main
+package raizu
 
 import (
-	"errors"
-	"log"
 	"net/http"
-
-	"github.com/aezhar/raizu"
-	"github.com/aezhar/raizu/_examples/multiapps/app1"
-	"github.com/aezhar/raizu/_examples/multiapps/app2"
-	"github.com/aezhar/raizu/raizumux"
 )
 
-func mainE() error {
-	bp := raizu.AppMuxBlueprint(raizu.AppMuxConfig[*raizumux.Mux]{
-		Prefix:   "/",
-		NewMuxFn: raizumux.New,
-		Blueprints: []raizu.Blueprint{
-			app1.Blueprint(app1.Config{Prefix: "/app1"}),
-			app2.Blueprint(app2.Config{Prefix: "/app2"}),
-		},
-	})
-
-	cfg := raizu.NewServerConfigDefault().
-		WithBlueprint(bp)
-
-	s, err := raizu.NewServer(cfg)
-	if err != nil {
-		return err
+type (
+	HandlerAppConfig struct {
+		Prefix  string
+		Handler http.Handler
 	}
-
-	err = raizu.ListenAndServe(s, ":8000")
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
+	HandlerApp struct {
+		config HandlerAppConfig
 	}
-	return err
+)
+
+func (a *HandlerApp) Prefix() string        { return a.config.Prefix }
+func (a *HandlerApp) Handler() http.Handler { return a.config.Handler }
+
+func NewHandlerApp(cfg HandlerAppConfig) (*HandlerApp, error) {
+	return &HandlerApp{config: cfg}, nil
 }
 
-func main() {
-	if err := mainE(); err != nil {
-		log.Fatal(err)
-	}
+func HandlerAppBlueprint(cfg HandlerAppConfig) Blueprint {
+	return NewBlueprint(NewHandlerApp, cfg)
 }

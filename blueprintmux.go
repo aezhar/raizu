@@ -32,22 +32,23 @@ type (
 		http.Handler
 		Mounter
 	}
-	AppMuxConfig struct {
+
+	AppMuxConfig[MT MounterHandler] struct {
 		Prefix     string
-		NewMuxFn   func(string) MounterHandler
+		NewMuxFn   func() MT
 		Blueprints []Blueprint
 	}
-	AppMux struct {
-		cfg AppMuxConfig
+	AppMux[MT MounterHandler] struct {
+		cfg AppMuxConfig[MT]
 		mux http.Handler
 	}
 )
 
-func (ag *AppMux) Prefix() string        { return ag.cfg.Prefix }
-func (ag *AppMux) Handler() http.Handler { return ag.mux }
+func (ag *AppMux[MT]) Prefix() string        { return ag.cfg.Prefix }
+func (ag *AppMux[MT]) Handler() http.Handler { return ag.mux }
 
-func NewAppMux(cfg AppMuxConfig) (*AppMux, error) {
-	mux := cfg.NewMuxFn(cfg.Prefix)
+func NewAppMux[MT MounterHandler](cfg AppMuxConfig[MT]) (*AppMux[MT], error) {
+	mux := cfg.NewMuxFn()
 	for _, af := range cfg.Blueprints {
 		hp, err := af.NewHandlerProvider()
 		if err != nil {
@@ -56,9 +57,14 @@ func NewAppMux(cfg AppMuxConfig) (*AppMux, error) {
 		mux.Mount(hp.Prefix(), hp.Handler())
 	}
 
-	return &AppMux{cfg: cfg, mux: mux}, nil
+	h := http.Handler(mux)
+	if cfg.Prefix != "/" {
+		h = http.StripPrefix(cfg.Prefix, h)
+	}
+
+	return &AppMux[MT]{cfg: cfg, mux: h}, nil
 }
 
-func AppMuxBlueprint(cfg AppMuxConfig) Blueprint {
-	return NewBlueprint(NewAppMux, cfg)
+func AppMuxBlueprint[MT MounterHandler](cfg AppMuxConfig[MT]) Blueprint {
+	return NewBlueprint(NewAppMux[MT], cfg)
 }
